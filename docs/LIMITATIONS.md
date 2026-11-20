@@ -43,7 +43,7 @@
 * Build output is not bit-for-bit reproducible (`BUILD.md`).
 * Images are large (≈ 4.3 GB sparse each); GitHub release assets are limited to 2 GiB, so they are published compressed/split.
 
-## Next steps (planned, not promised)
-* **Better camera quality** — a proper libcamera tuning profile for the rear OV13B10 sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.
-* **Making better use of the device's sensors** — the ambient-light sensor and the accelerometer are already available; next come automatic brightness and smarter orientation handling on top of the working auto-rotate.
-* **A more native experience** — fewer scripted workarounds, more of the interface as first-class Plasma components, and touch behaviour (gestures, start menu, Settings, lock screen) that feels like a part of the system rather than an add-on.
+## Upcoming changes (planned, not promised)
+* **UI changes and improvements** — keep refining the interface: fewer scripted workarounds and more first-class Plasma components, touch behaviour (gestures, start menu, Settings, lock screen) that feels like part of the system, and smarter use of the sensors that already work (automatic brightness, orientation handling on top of auto-rotate).
+* **Sound quality issues and calibration** — look into the known sound-quality problems and calibrate the audio output (levels, tuning) for this tablet.
+* **Camera quality** — a proper libcamera tuning profile for the rear OV13B10 sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.

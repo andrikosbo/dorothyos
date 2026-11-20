@@ -167,6 +167,9 @@ $ld = [
         <a href="?lang=<?= e($code) ?>" hreflang="<?= e($code) ?>" lang="<?= e($code) ?>" title="<?= e($label) ?>"<?= $code === $lang ? ' aria-current="true"' : '' ?>><?= e(strtoupper($code === 'el' ? 'ΕΛ' : $code)) ?></a>
 <?php endforeach; ?>
       </div>
+<?php if ($cfg['repo_url'] !== ''): ?>
+      <a class="btn btn-ghost btn-sm nav-gh" href="<?= e($cfg['repo_url']) ?>" rel="noopener"><?= e(t('nav.github')) ?></a>
+<?php endif; ?>
       <a class="btn btn-sm" href="#get"><?= e(t('nav.get')) ?></a>
     </div>
   </div>
@@ -184,6 +187,9 @@ $ld = [
       <div class="cta">
         <a class="btn" href="#get"><?= e(t('hero.cta1')) ?> <?= ico('arrow', 'ico ico-end') ?></a>
         <a class="btn btn-ghost" href="#features"><?= e(t('hero.cta2')) ?></a>
+<?php if ($cfg['repo_url'] !== ''): ?>
+        <a class="btn btn-ghost" href="<?= e($cfg['repo_url']) ?>" rel="noopener"><?= e(t('hero.cta3')) ?> <?= ico('arrow', 'ico ico-end') ?></a>
+<?php endif; ?>
       </div>
       <p class="notice <?= $rc ? 'notice-warn' : 'notice-ok' ?>"><?= ico($rc ? 'warn' : 'check') ?><span><?= $rc ? t('hero.warn_rc') : t('hero.warn_ok') ?></span></p>
     </div>

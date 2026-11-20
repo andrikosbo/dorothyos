@@ -6,7 +6,7 @@ return [
     'title'     => 'DorothyOS — a tablet-first Linux for the Xiaomi Pad 6',
     'desc'      => 'DorothyOS turns the Xiaomi Pad 6 into a tablet that behaves like one: an iPad-style home screen, touch control center, start menu and Settings on KDE Plasma 6. Open source, reproducible, flashable.',
     'skip'      => 'Skip to content',
-    'nav' => ['features' => 'Features', 'look' => 'Look', 'get' => 'Get it', 'install' => 'Install', 'status' => 'Status', 'source' => 'Source'],
+    'nav' => ['features' => 'Features', 'look' => 'Look', 'get' => 'Get it', 'install' => 'Install', 'status' => 'Status', 'source' => 'Source', 'github' => 'GitHub'],
     'lang_label' => 'Language',
 
     'hero' => [
@@ -15,6 +15,7 @@ return [
         'lead'    => 'An iPad-style home screen, a touch control center, a start menu and a Settings app — on KDE Plasma 6 and a normal, upgradeable Linux. Open source, reproducible, flashable.',
         'cta1'    => 'Get the images',
         'cta2'    => 'What is inside',
+        'cta3'    => 'View on GitHub',
         'warn_rc' => '<strong>Verified on one Tianma tablet only.</strong> The images are built and checked offline; the Tianma image booted and ran on one tablet, CSOT has not been tried. The first flash is a test. Back up first.',
         'warn_ok' => 'Tested on real tablets — see the status below.',
         'mock_caption' => 'A real screenshot from the reference tablet — the default home screen.',
@@ -110,11 +111,11 @@ return [
             'Touch behaviour of the start menu and the Settings app.',
             'Package upgrades after installation.',
         ],
-        'next_title' => 'Next steps',
+        'next_title' => 'Upcoming changes',
         'next' => [
-            'Better camera quality — a proper tuning profile for the rear sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.',
-            'Making better use of the device’s sensors — the ambient-light sensor and the accelerometer are already available; next come automatic brightness and smarter orientation handling on top of auto-rotate.',
-            'A more native experience — fewer scripted workarounds, more of the interface as first-class Plasma components, and touch behaviour that feels like part of the system.',
+            'UI changes and improvements — keep refining the interface: fewer scripted workarounds, more first-class Plasma components, touch behaviour that feels like part of the system, and smarter use of the sensors that already work (automatic brightness, orientation).',
+            'Sound quality issues and calibration — look into the known sound-quality problems and calibrate the audio output (levels, tuning) for this tablet.',
+            'Camera quality — a proper tuning profile for the rear sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.',
         ],
         'report' => 'Flashed one? Tell us how it went — a report from a real tablet is the most valuable thing right now.',
         'report_cta' => 'Send a report',

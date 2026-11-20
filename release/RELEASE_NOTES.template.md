@@ -34,10 +34,10 @@ Plasma Setup creates your account — there is no default user or password; sshd
 * kernel-side quirks of the mainline port (charge-pump probe error, occasional vblank timeouts);
 * the images contain proprietary firmware blobs required by the hardware (`*.packages.txt` marks them `proprietary`); see the section *Firmware* below.
 
-## Next steps
-* **Better camera quality** — a proper libcamera tuning profile for the rear OV13B10 sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.
-* **Making better use of the device's sensors** — the ambient-light sensor and the accelerometer are already available; next come automatic brightness and smarter orientation handling on top of the working auto-rotate.
-* **A more native experience** — fewer scripted workarounds, more of the interface as first-class Plasma components, and touch behaviour (gestures, start menu, Settings, lock screen) that feels like a part of the system rather than an add-on.
+## Upcoming changes
+* **UI changes and improvements** — keep refining the interface: fewer scripted workarounds and more first-class Plasma components, touch behaviour (gestures, start menu, Settings, lock screen) that feels like part of the system, and smarter use of the sensors that already work (automatic brightness, orientation handling on top of auto-rotate).
+* **Sound quality issues and calibration** — look into the known sound-quality problems and calibrate the audio output (levels, tuning) for this tablet.
+* **Camera quality** — a proper libcamera tuning profile for the rear OV13B10 sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.
 
 ## Firmware
 The tablet needs closed-source firmware (touch, GPU, audio and sensor DSPs, video, Wi-Fi, Bluetooth), so the images contain it; the git repository does not. The linux-firmware

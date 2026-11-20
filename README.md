@@ -95,11 +95,11 @@ The image contains **no account, no password, no ssh key, no Wi-Fi profile and n
 is created at the first boot. The root filesystem is **not encrypted** (a shared passphrase would be a shared secret) — encrypt your own build if you
 need to. `docs/SECURITY-MODEL.md` has the full table; how to report a vulnerability is in `SECURITY.md`.
 
-## Next steps
+## Upcoming changes
 
-* **Better camera quality** — a proper libcamera tuning profile for the rear OV13B10 sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.
-* **Making better use of the device's sensors** — the ambient-light sensor and the accelerometer are already available; next come automatic brightness and smarter orientation handling on top of the working auto-rotate.
-* **A more native experience** — fewer scripted workarounds, more of the interface as first-class Plasma components, and touch behaviour (gestures, start menu, Settings, lock screen) that feels like a part of the system rather than an add-on.
+* **UI changes and improvements** — keep refining the interface: fewer scripted workarounds and more first-class Plasma components, touch behaviour (gestures, start menu, Settings, lock screen) that feels like part of the system, and smarter use of the sensors that already work (automatic brightness, orientation handling on top of auto-rotate).
+* **Sound quality issues and calibration** — look into the known sound-quality problems and calibrate the audio output (levels, tuning) for this tablet.
+* **Camera quality** — a proper libcamera tuning profile for the rear OV13B10 sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.
 
 The current gaps are listed in `docs/LIMITATIONS.md`.
 

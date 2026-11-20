@@ -20,7 +20,7 @@ First complete set of sources and images; **built and validated offline**, and t
 * Tooling: `flash/` (guarded fastboot flashing, panel detection), `tests/audit.sh`, `tests/validate.sh`, `release/` (assets + guarded publish script).
 * Documentation: install, build, panels, bootloader, security, limitations, branding, decisions, publishing, third-party notices.
 
-### Next steps
-* **Better camera quality** — a proper libcamera tuning profile for the rear OV13B10 sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.
-* **Making better use of the device's sensors** — the ambient-light sensor and the accelerometer are already available; next come automatic brightness and smarter orientation handling on top of the working auto-rotate.
-* **A more native experience** — fewer scripted workarounds, more of the interface as first-class Plasma components, and touch behaviour (gestures, start menu, Settings, lock screen) that feels like a part of the system rather than an add-on.
+### Upcoming changes
+* **UI changes and improvements** — keep refining the interface: fewer scripted workarounds and more first-class Plasma components, touch behaviour (gestures, start menu, Settings, lock screen) that feels like part of the system, and smarter use of the sensors that already work (automatic brightness, orientation handling on top of auto-rotate).
+* **Sound quality issues and calibration** — look into the known sound-quality problems and calibrate the audio output (levels, tuning) for this tablet.
+* **Camera quality** — a proper libcamera tuning profile for the rear OV13B10 sensor (colour, white balance, noise), then autofocus and the front camera once the kernel can describe them.
