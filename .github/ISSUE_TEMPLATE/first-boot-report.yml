@@ -1,0 +1,39 @@
+name: First boot of a release image
+description: You flashed a DorothyOS image on a Xiaomi Pad 6 — tell us what happened (success or failure)
+labels: [hardware-report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! **Do not post** serial numbers, IMEI, MAC addresses, Wi-Fi names or passwords, backups of `persist`. Replace identifiers by `xx`.
+  - type: dropdown
+    id: panel
+    attributes:
+      label: Panel
+      options: [Tianma, CSOT, Unknown]
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes:
+      label: Image version (`cat /etc/dorothyos-release`, or the file name)
+    validations: {required: true}
+  - type: dropdown
+    id: result
+    attributes:
+      label: How far did it get?
+      options:
+        - Did not leave the bootloader / black screen
+        - Splash shown, no login / wizard
+        - Plasma Setup wizard worked, account created
+        - Logged in, tablet UI setup finished
+        - Everything I tried worked
+    validations: {required: true}
+  - type: textarea
+    id: details
+    attributes:
+      label: What did you see? Splash (ring), orientation, touch, anything odd
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines (optional; check them for identifiers first)
+      render: text

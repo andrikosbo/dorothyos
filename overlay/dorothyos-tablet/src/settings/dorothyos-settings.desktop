@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+GenericName=System Settings
+Comment=Wi-Fi, Bluetooth, display, sound, battery, appearance and more
+Exec=dorothyos-settings
+Icon=preferences-system
+Categories=Settings;
+Keywords=settings;preferences;wifi;bluetooth;display;sound;battery;
+StartupNotify=true

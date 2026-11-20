@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Tablet setup (first login)
+Comment=Applies the DorothyOS tablet look and gestures once, at the first login
+Exec=/usr/bin/pipa-first-login
+OnlyShowIn=KDE;
+NoDisplay=true
+X-KDE-autostart-after=panel
+X-GNOME-Autostart-enabled=true

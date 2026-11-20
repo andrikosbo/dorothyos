@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <!-- desktop-file ids on the home screen, in order, separated by ";" (edited on the tablet: long press an icon, or the + button).
+         The default below is replaced by phase12-home-screen-user.sh -->
+    <entry name="ids" type="String">
+      <default>@DEFAULT_IDS@</default>
+    </entry>
+    <!-- icon look: light | dark | glass (the sheet behind the sliders button at the top right) -->
+    <entry name="iconStyle" type="String">
+      <default>light</default>
+    </entry>
+    <!-- true: icon style switches by itself, light by day / dark from 20:00 to 07:00 -->
+    <entry name="iconAuto" type="Bool">
+      <default>false</default>
+    </entry>
+    <!-- icon size factor, 1.0 = default (about 96 px tiles on the Pad 6) -->
+    <entry name="iconScale" type="Double">
+      <default>1.0</default>
+    </entry>
+    <entry name="labels" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="showSearch" type="Bool">
+      <default>true</default>
+    </entry>
+    <!-- dock + status bar look (sheet "Dock & bar"; applied by ~/.local/bin/pipa-dock): opacity in %, corner radius in px, dock height in px -->
+    <entry name="dockAlpha" type="Int">
+      <default>85</default>
+    </entry>
+    <entry name="dockRadius" type="Int">
+      <default>18</default>
+    </entry>
+    <entry name="dockSize" type="Int">
+      <default>56</default>
+    </entry>
+    <entry name="barAlpha" type="Int">
+      <default>55</default>
+    </entry>
+    <entry name="dockHide" type="Bool">
+      <default>false</default>
+    </entry>
+  </group>
+</kcfg>

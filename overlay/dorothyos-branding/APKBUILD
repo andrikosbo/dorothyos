@@ -1,0 +1,56 @@
+# Maintainer: DorothyOS contributors <noreply@dorothyos.invalid>
+pkgname=dorothyos-branding
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="DorothyOS identity: name, logo, boot splash, wallpapers, About page"
+url="https://dorothy.gr/dorothyos"
+arch="noarch"
+license="MIT AND CC0-1.0 AND CC-BY-4.0"
+depends="plymouth"
+install="$pkgname.post-install $pkgname.post-upgrade $pkgname.pre-deinstall"
+# re-apply the identity after any change in /etc or /usr/lib (alpine-release / postmarketos-release upgrades restore the upstream symlink)
+triggers="$pkgname.trigger=/etc:/usr/lib"
+source="$pkgname-$pkgver.tar.gz"
+options="!check"
+
+build() {
+	return 0
+}
+
+package() {
+	install -Dm755 bin/dorothyos-branding-apply "$pkgdir"/usr/bin/dorothyos-branding-apply
+
+	local share="$pkgdir"/usr/share/dorothyos
+	install -Dm644 dorothyos-branding.conf "$share"/dorothyos-branding.conf
+	install -Dm644 issue "$share"/issue
+	install -Dm644 motd "$share"/motd
+	install -Dm644 kcm-about-distrorc.in "$share"/kcm-about-distrorc.in
+	install -d "$share"/logo
+	install -m644 logo/*.svg "$share"/logo/
+
+	# icon theme + pixmap (os-release LOGO=dorothyos, KDE About page)
+	install -d "$pkgdir"/usr/share/icons
+	cp -a icons/hicolor "$pkgdir"/usr/share/icons/
+	install -Dm644 icons/hicolor/256x256/apps/dorothyos.png "$pkgdir"/usr/share/pixmaps/dorothyos.png
+
+	# boot splash (included in the initramfs by mkinitfs together with the rest of /usr/share/plymouth)
+	install -d "$pkgdir"/usr/share/plymouth/themes
+	cp -a plymouth/dorothyos "$pkgdir"/usr/share/plymouth/themes/
+
+	# wallpapers as KDE wallpaper packages
+	install -d "$pkgdir"/usr/share/wallpapers
+	cp -a wallpapers/. "$pkgdir"/usr/share/wallpapers/
+
+	find "$pkgdir" -type d -exec chmod 755 {} +
+	find "$pkgdir" -type f ! -perm -u+x -exec chmod 644 {} +
+	chmod 755 "$pkgdir"/usr/bin/dorothyos-branding-apply
+
+	install -Dm644 CREDITS.md "$pkgdir"/usr/share/doc/$pkgname/CREDITS.md
+	install -Dm644 ARTWORK-LICENSE.txt "$pkgdir"/usr/share/licenses/$pkgname/ARTWORK-LICENSE.txt
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+	# firmware notices: the redistribution licences of the firmware in the image travel with it (docs/FIRMWARE.md)
+	install -Dm644 FIRMWARE.md "$pkgdir"/usr/share/doc/$pkgname/FIRMWARE.md
+	for f in firmware-licenses/*; do
+		install -Dm644 "$f" "$pkgdir"/usr/share/licenses/$pkgname/firmware/"${f##*/}"
+	done
+}

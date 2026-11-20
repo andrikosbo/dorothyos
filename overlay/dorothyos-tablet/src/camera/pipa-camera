@@ -1,0 +1,16 @@
+#!/bin/sh
+# pipa-camera — the "Camera" launcher. Starts the recommended camera app; if it is not installed yet, asks before downloading it
+# (it is a ~170 MB download from Flathub) and otherwise falls back to GNOME Snapshot when that is present.
+ID=io.github.cosmic_utils.camera
+if flatpak info "$ID" >/dev/null 2>&1; then
+  /usr/share/dorothyos-tablet/camera/pipa-camera-setup hide >/dev/null 2>&1 || :
+  exec flatpak run "$ID" "$@"
+fi
+if command -v kdialog >/dev/null 2>&1 &&
+   kdialog --title "Camera" --yesno "The Camera app is not installed yet.\n\nIt is a download of about 170 MB from Flathub (needs an internet connection). Download and install it now?"; then
+  if /usr/share/dorothyos-tablet/camera/pipa-camera-setup install; then exec flatpak run "$ID" "$@"; fi
+  kdialog --title "Camera" --error "The installation failed. Check the internet connection and try again."
+fi
+# fallback: works, but the picture may be rotated when the tablet is turned (Snapshot ignores sensor and screen rotation)
+command -v snapshot >/dev/null 2>&1 && exec snapshot "$@"
+exit 1

@@ -1,0 +1,55 @@
+#!/bin/sh
+# pipa-cc — helper of the touch control center widget (org.pipa.controlcenter). Plasma 6 / postmarketOS, user level only.
+#   pipa-cc state                      key=value lines: wifi ssid bt night rotlock dnd bright vol mute
+#   pipa-cc wifi|bt|night|rotlock|dnd on|off
+#   pipa-cc bright 0-100 | volume 0-100 | mute on|off
+#   pipa-cc shot | lock | sleep | wallpaper | settings
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
+OUT=DSI-1
+BR="org.kde.Solid.PowerManagement /org/kde/Solid/PowerManagement/Actions/BrightnessControl org.kde.Solid.PowerManagement.Actions.BrightnessControl"
+NOTIF="org.freedesktop.Notifications /org/freedesktop/Notifications org.freedesktop.Notifications.Inhibited"
+yn() { if [ "$1" = "$2" ]; then echo "$3=on"; else echo "$3=off"; fi; }
+
+case "${1:-state}" in
+state)
+  yn "$(nmcli -t radio wifi 2>/dev/null)" enabled wifi
+  echo "ssid=$(nmcli -t -f ACTIVE,SSID dev wifi list --rescan no 2>/dev/null | sed -n 's/^yes://p' | head -1)"
+  yn "$(bluetoothctl show 2>/dev/null | awk '/Powered:/{print $2; exit}')" yes bt
+  yn "$(kreadconfig6 --file kwinrc --group NightColor --key Active --default false)" true night
+  yn "$(kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/Auto Rotate Policy:/{print $4; exit}')" never rotlock
+  yn "$(qdbus6 $NOTIF 2>/dev/null)" true dnd
+  cur=$(qdbus6 $BR.brightness 2>/dev/null); max=$(qdbus6 $BR.brightnessMax 2>/dev/null)
+  if [ -n "$cur" ] && [ -n "$max" ] && [ "$max" -gt 0 ]; then echo "bright=$((cur * 100 / max))"; fi
+  v=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %); echo "vol=${v:-0}"
+  yn "$(pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null | awk '{print $2}')" yes mute ;;
+wifi)    nmcli radio wifi "${2:-on}" ;;
+bt)      [ "${2:-on}" = on ] && rfkill unblock bluetooth 2>/dev/null; bluetoothctl power "${2:-on}" >/dev/null ;;
+night)
+  if [ "${2:-on}" = on ]; then
+    kwriteconfig6 --notify --file kwinrc --group NightColor --key Mode Constant
+    kwriteconfig6 --notify --file kwinrc --group NightColor --key NightTemperature 4000
+    kwriteconfig6 --notify --file kwinrc --group NightColor --key Active true
+  else kwriteconfig6 --notify --file kwinrc --group NightColor --key Active false; fi
+  qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 ;;
+rotlock) if [ "${2:-on}" = on ]; then p=never; else p=inTabletMode; fi; kscreen-doctor "output.$OUT.autoRotatePolicy.$p" >/dev/null 2>&1 ;;
+dnd)
+  if [ "${2:-on}" = on ]; then systemctl --user is-active --quiet pipa-dnd.service || systemd-run --user --unit=pipa-dnd --collect "$HOME/.local/bin/pipa-dnd" >/dev/null 2>&1
+  else systemctl --user stop pipa-dnd.service 2>/dev/null; fi ;;
+bright)
+  max=$(qdbus6 $BR.brightnessMax 2>/dev/null); [ -n "$max" ] || exit 1
+  pct=${2:-50}; [ "$pct" -lt 3 ] && pct=3; [ "$pct" -gt 100 ] && pct=100
+  qdbus6 $BR.setBrightness $((max * pct / 100)) >/dev/null 2>&1 ;;
+volume)
+  pactl set-sink-volume @DEFAULT_SINK@ "${2:-50}%"; [ "${2:-50}" -gt 0 ] && pactl set-sink-mute @DEFAULT_SINK@ 0 ;;
+mute)    if [ "${2:-on}" = on ]; then pactl set-sink-mute @DEFAULT_SINK@ 1; else pactl set-sink-mute @DEFAULT_SINK@ 0; fi ;;
+shot)
+  sleep 1; mkdir -p "$HOME/Pictures/Screenshots"; f="$HOME/Pictures/Screenshots/screenshot-$(date +%F_%H-%M-%S).png"
+  spectacle -b -n -f -o "$f" >/dev/null 2>&1 && command -v notify-send >/dev/null && notify-send -a "Screenshot" -t 3000 "Screenshot saved" "Pictures/Screenshots" >/dev/null 2>&1 ;;
+lock)      loginctl lock-session ;;
+sleep)     systemctl suspend ;;
+wallpaper) "$HOME/.local/bin/pipa-wallpaper" next ;;
+settings)  command -v dorothyos-settings >/dev/null 2>&1 && exec dorothyos-settings; exec systemsettings ;;
+*) echo "usage: pipa-cc state | wifi|bt|night|rotlock|dnd on|off | bright N | volume N | mute on|off | shot|lock|sleep|wallpaper|settings"; exit 2 ;;
+esac

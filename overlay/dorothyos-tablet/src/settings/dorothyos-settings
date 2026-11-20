@@ -1,0 +1,6 @@
+#!/bin/sh
+# dorothyos-settings — opens the DorothyOS Settings app (a Plasma applet shown in its own window); falls back to KDE's System Settings.
+if [ -d /usr/share/plasma/plasmoids/org.dorothyos.settings ] || [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/plasma/plasmoids/org.dorothyos.settings" ]; then
+  exec plasmawindowed org.dorothyos.settings "$@"
+fi
+exec systemsettings "$@"

@@ -1,0 +1,14 @@
+{
+  "KPlugin": {
+    "Id": "DorothyOS-EmberHigh",
+    "Name": "DorothyOS Ember High",
+    "Description": "DorothyOS wallpaper",
+    "Authors": [
+      {
+        "Name": "DorothyOS contributors"
+      }
+    ],
+    "License": "CC0-1.0"
+  },
+  "X-KDE-PluginInfo-Version": "1.0"
+}

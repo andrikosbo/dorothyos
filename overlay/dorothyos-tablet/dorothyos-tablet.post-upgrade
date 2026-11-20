@@ -1,0 +1,3 @@
+#!/bin/sh
+/usr/share/dorothyos-tablet/system/pipa-lockscreen apply || :
+exit 0

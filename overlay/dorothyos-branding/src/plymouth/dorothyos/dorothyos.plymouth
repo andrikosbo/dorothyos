@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=DorothyOS
+Description=DorothyOS boot splash: orange ring with a spinning arc
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/dorothyos
+ScriptFile=/usr/share/plymouth/themes/dorothyos/dorothyos.script

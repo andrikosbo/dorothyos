@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [ { "Name": "DorothyOS contributors" } ],
+        "Category": "System Information",
+        "Description": "Touch-first settings for DorothyOS: Wi-Fi, Bluetooth, display, sound, battery, appearance, dock and more",
+        "Icon": "preferences-system",
+        "Id": "org.dorothyos.settings",
+        "License": "MIT",
+        "Name": "DorothyOS Settings",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

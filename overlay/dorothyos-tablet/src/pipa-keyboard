@@ -1,0 +1,12 @@
+#!/bin/sh
+# pipa-keyboard — toggle KWin's on-screen keyboard (Xiaomi Pad 6 / Plasma 6.8). Backup for the automatic popup:
+# useful with a Bluetooth/cover keyboard attached, or for apps that do not announce a text field.
+# Uses only KWin's own D-Bus interface (org.kde.kwin.VirtualKeyboard); changes no configuration.
+export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+export DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}
+VK="org.kde.KWin /VirtualKeyboard org.kde.kwin.VirtualKeyboard"
+if [ "$(busctl --user get-property $VK visible 2>/dev/null)" = "b true" ]; then
+  busctl --user set-property $VK active b false
+else
+  busctl --user call $VK forceActivate
+fi

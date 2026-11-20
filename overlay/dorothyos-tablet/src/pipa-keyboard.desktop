@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Keyboard
+GenericName=On-screen keyboard
+Comment=Show or hide the on-screen keyboard
+Exec=/home/user/.local/bin/pipa-keyboard
+Icon=input-keyboard-virtual
+Terminal=false
+Categories=Utility;Accessibility;
+StartupNotify=false

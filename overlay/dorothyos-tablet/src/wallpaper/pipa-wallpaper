@@ -1,0 +1,38 @@
+#!/bin/sh
+# pipa-wallpaper — rotate the desktop AND lock-screen wallpaper (Plasma 6, Xiaomi Pad 6). Alternates between the folders (categories)
+# below ~/Pictures/Wallpapers, never repeats one of the last 12 pictures. Pictures: ~/Pictures/Wallpapers/<category>/*.jpg
+#   pipa-wallpaper next      change now
+#   pipa-wallpaper auto      change only if the last change is >= 55 min old (used by the systemd timer, also after boot/resume)
+#   pipa-wallpaper status    show current picture and time of the last change
+# State: ~/.local/state/pipa-wallpaper/{last-cat,history,stamp}
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
+ROOT="$HOME/Pictures/Wallpapers"; ST="$HOME/.local/state/pipa-wallpaper"; KEEP=12
+mkdir -p "$ST"; : >> "$ST/history"
+now=$(date +%s)
+case "${1:-next}" in
+  status) echo "current: $(tail -n1 "$ST/history")"; echo "changed: $(date -d "@$(cat "$ST/stamp" 2>/dev/null || echo 0)" 2>/dev/null)"; exit 0 ;;
+  auto)   last=$(cat "$ST/stamp" 2>/dev/null || echo 0); [ $((now - last)) -ge 3300 ] || exit 0 ;;
+  next)   ;;
+  *) echo "usage: pipa-wallpaper next|auto|status"; exit 2 ;;
+esac
+lastcat=$(cat "$ST/last-cat" 2>/dev/null)
+# next category (sub folder with at least one .jpg) after the last one used, cyclic
+cat=$(for d in "$ROOT"/*/; do c=${d%/}; c=${c##*/}; ls "$d"*.jpg >/dev/null 2>&1 && echo "$c"; done | awk -v l="$lastcat" '{a[++n]=$0} END{if(!n) exit; for(i=1;i<=n;i++) if(a[i]==l){print a[i%n+1]; exit} print a[1]}')
+[ -n "$cat" ] || { echo "no wallpapers in $ROOT" >&2; exit 1; }
+pick() {  # random file of $1 that is not in the recent history
+  # (awk, not grep -vxF -f: busybox grep treats an empty pattern file as "match everything")
+  ls "$ROOT/$1"/*.jpg 2>/dev/null | awk -v s="$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')" -v H="$ST/history" 'BEGIN{srand(s); while ((getline l < H) > 0) seen[l]=1} !($0 in seen){a[++n]=$0} END{if(n) print a[int(rand()*n)+1]}'
+}
+f=$(pick "$cat")
+[ -n "$f" ] || { : > "$ST/history"; f=$(pick "$cat"); }                       # everything used recently: start over
+[ -n "$f" ] || { echo "no wallpapers in $ROOT/$cat" >&2; exit 1; }
+# lock screen first (read when the screen locks), then the live desktop (plasmashell may still be starting after login: retry)
+kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.image
+kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$f"
+ok=1; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do plasma-apply-wallpaperimage "$f" >/dev/null 2>&1 && { ok=0; break; }; sleep 2; done
+[ $ok = 0 ] || { echo "plasma-apply-wallpaperimage failed" >&2; exit 1; }
+echo "$cat" > "$ST/last-cat"; echo "$now" > "$ST/stamp"; echo "$f" >> "$ST/history"
+tail -n "$KEEP" "$ST/history" > "$ST/history.new" && mv "$ST/history.new" "$ST/history"
+echo "wallpaper + lock screen: $f"

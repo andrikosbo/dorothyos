@@ -1,0 +1,22 @@
+name: Bug report
+description: Something in DorothyOS does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Never post serial numbers, IMEI, MAC addresses, Wi-Fi names or passwords. Replace identifiers by `xx`."
+  - type: dropdown
+    id: panel
+    attributes: {label: Panel, options: [Tianma, CSOT, Unknown]}
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes: {label: "Image version (`cat /etc/dorothyos-release`)"}
+    validations: {required: true}
+  - type: textarea
+    id: what
+    attributes: {label: What happened, and what did you expect?}
+    validations: {required: true}
+  - type: textarea
+    id: steps
+    attributes: {label: Steps to reproduce}

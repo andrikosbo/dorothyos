@@ -1,0 +1,67 @@
+#!/bin/sh
+# dorothyos-branding-apply [--quiet] — idempotent; applies the DorothyOS identity to the running system:
+#   /etc/os-release (replaces the symlink to the upstream file), /etc/issue, /etc/motd (only while they still hold the
+#   upstream Nura/postmarketOS text), /etc/xdg/kcm-about-distrorc (KDE "About this System") and the Plymouth theme setting.
+# Run by the apk scriptlets and by an apk trigger (so an upgrade of alpine-release / postmarketos-release cannot undo it).
+# Never fails the package manager: every step is best effort.
+CONF=/usr/share/dorothyos/dorothyos-branding.conf
+SHARE=/usr/share/dorothyos
+QUIET=0; [ "${1:-}" = "--quiet" ] && QUIET=1
+say() { [ "$QUIET" = 1 ] || echo "dorothyos-branding: $*"; }
+[ -r "$CONF" ] || exit 0
+. "$CONF"
+
+# ---- /etc/os-release
+tmp=$(mktemp /etc/.os-release.XXXXXX 2>/dev/null) || exit 0
+{
+	echo "NAME=\"$DOROTHYOS_NAME\""
+	echo "PRETTY_NAME=\"$DOROTHYOS_NAME $DOROTHYOS_RELEASE\""
+	echo "ID=$DOROTHYOS_ID"
+	echo 'ID_LIKE="nura alpine"'
+	echo "VERSION=\"$DOROTHYOS_RELEASE\""
+	echo "VERSION_ID=\"$DOROTHYOS_VERSION_ID\""
+	echo "VARIANT=\"$DOROTHYOS_VARIANT\""
+	echo "VARIANT_ID=tablet"
+	[ -n "$DOROTHYOS_HOME_URL" ] && echo "HOME_URL=\"$DOROTHYOS_HOME_URL\""
+	[ -n "$DOROTHYOS_SUPPORT_URL" ] && echo "SUPPORT_URL=\"$DOROTHYOS_SUPPORT_URL\""
+	[ -n "$DOROTHYOS_BUG_URL" ] && echo "BUG_REPORT_URL=\"$DOROTHYOS_BUG_URL\""
+	echo "LOGO=dorothyos"
+	echo "ANSI_COLOR=\"$DOROTHYOS_ANSI_COLOR\""
+} > "$tmp" 2>/dev/null
+chmod 644 "$tmp"
+if [ -L /etc/os-release ] || ! cmp -s "$tmp" /etc/os-release 2>/dev/null; then
+	mv -f "$tmp" /etc/os-release && say "/etc/os-release written"
+else
+	rm -f "$tmp"
+fi
+
+# ---- /etc/issue and /etc/motd: only replace the stock upstream text, never the user's own edits
+repl() { # source destination
+	if [ ! -e "$2" ] || { grep -qiE 'nura|postmarketos' "$2" && ! grep -q "$DOROTHYOS_NAME" "$2"; }; then
+		cp "$1" "$2" 2>/dev/null && chmod 644 "$2" && say "$2 written"
+	fi
+}
+repl "$SHARE/issue" /etc/issue
+repl "$SHARE/motd" /etc/motd
+
+# ---- KDE "About this System"
+if [ -r "$SHARE/kcm-about-distrorc.in" ]; then
+	mkdir -p /etc/xdg
+	sed -e "s|@NAME@|$DOROTHYOS_NAME|" -e "s|@RELEASE@|$DOROTHYOS_RELEASE|" -e "s|@VARIANT@|$DOROTHYOS_VARIANT|" \
+		"$SHARE/kcm-about-distrorc.in" > /etc/xdg/kcm-about-distrorc.tmp 2>/dev/null &&
+	{ [ -z "$DOROTHYOS_HOME_URL" ] || echo "Website=$DOROTHYOS_HOME_URL" >> /etc/xdg/kcm-about-distrorc.tmp; } &&
+	chmod 644 /etc/xdg/kcm-about-distrorc.tmp && mv -f /etc/xdg/kcm-about-distrorc.tmp /etc/xdg/kcm-about-distrorc
+fi
+
+# ---- Plymouth: select our theme unless the user chose another one
+mkdir -p /etc/plymouth
+PC=/etc/plymouth/plymouthd.conf
+if [ ! -f "$PC" ]; then
+	printf '[Daemon]\nTheme=dorothyos\n' > "$PC"
+elif grep -q '^Theme=pmos-spin' "$PC"; then
+	sed -i 's/^Theme=pmos-spin/Theme=dorothyos/' "$PC"
+elif ! grep -q '^Theme=' "$PC"; then
+	if grep -q '^\[Daemon\]' "$PC"; then sed -i 's/^\[Daemon\]/[Daemon]\nTheme=dorothyos/' "$PC"
+	else printf '\n[Daemon]\nTheme=dorothyos\n' >> "$PC"; fi
+fi
+exit 0

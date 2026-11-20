@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Overview
+GenericName=Recent apps
+Comment=Show all open apps (same as swiping in from the right edge)
+Exec=qdbus6 org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component.invokeShortcut Overview
+Icon=window-duplicate
+Terminal=false
+Categories=System;
+StartupNotify=false

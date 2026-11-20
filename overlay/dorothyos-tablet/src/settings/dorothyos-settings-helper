@@ -1,0 +1,348 @@
+#!/usr/bin/env python3
+"""dorothyos-settings-helper — the engine behind the DorothyOS Settings app (plasmoid org.dorothyos.settings).
+Runs as the normal user, no root.  Every command prints ONE line of JSON on stdout so the QML side only has to JSON.parse it.
+It talks to the same things the desktop uses (NetworkManager, BlueZ, KWin/kscreen, PowerDevil, PulseAudio, tuned-ppd) and
+reuses the helpers of the control center (pipa-cc) and the dock (pipa-dock) where they exist.
+
+  state                         everything the pages show (wifi, bluetooth, brightness, volume, scale, dark mode, accent, battery ...)
+  wifi on|off | wifi-list | wifi-connect SSID
+  bt on|off | bt-list | bt-connect MAC | bt-disconnect MAC
+  bright N | volume N | mute on|off | night on|off | rotlock on|off | dnd on|off
+  scale 1.5 | dark on|off | accent #rrggbb | kbd on|off | profile power-saver|balanced|performance
+  dock-get | dock-set key=value ...     (dockSize dockAlpha dockRadius barAlpha dockHide)
+  icons-style light|dark|glass | wallpaper-next
+  about                         device / system information
+  credits                       shows the acknowledgements in a dialog (kdialog)
+"""
+import json, os, re, shutil, subprocess, sys
+
+HOME = os.path.expanduser("~")
+UID = os.getuid()
+ENV = dict(os.environ)
+ENV.setdefault("XDG_RUNTIME_DIR", "/run/user/%d" % UID)
+ENV.setdefault("DBUS_SESSION_BUS_ADDRESS", "unix:path=%s/bus" % ENV["XDG_RUNTIME_DIR"])
+ENV.setdefault("WAYLAND_DISPLAY", "wayland-1")
+BIN = os.path.join(HOME, ".local/bin")
+CC = os.path.join(BIN, "pipa-cc")
+DOCK = os.path.join(BIN, "pipa-dock")
+ICONS = os.path.join(BIN, "pipa-icons")
+WALL = os.path.join(BIN, "pipa-wallpaper")
+OUTPUT = "DSI-1"
+ACCENT_DEFAULT = "#e85d00"
+RELEASE_VERSION = "0.1.0-rc1"      # keep in step with overlay/dorothyos-branding/src/dorothyos-branding.conf
+STATE_FILE = os.path.join(HOME, ".config", "dorothyos-settings.json")
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def sh(*args, timeout=20):
+    try:
+        r = subprocess.run(list(args), env=ENV, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+    except Exception as e:  # missing binary, timeout ...
+        return 127, "", str(e)
+
+
+def out(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+
+
+def load_state():
+    try:
+        return json.load(open(STATE_FILE))
+    except Exception:
+        return {}
+
+
+def save_state(d):
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    json.dump(d, open(STATE_FILE, "w"))
+
+
+def kread(group, key, default="", file="kdeglobals"):
+    rc, o, _ = sh("kreadconfig6", "--file", file, "--group", group, "--key", key, "--default", default)
+    return o if rc == 0 else default
+
+
+def current_scheme():
+    s = kread("General", "ColorScheme")
+    if s:
+        return s
+    lnf = kread("KDE", "LookAndFeelPackage")
+    return "BreezeDark" if "dark" in lnf.lower() else "BreezeLight"
+
+
+def read_cc_state():
+    d = {}
+    if os.path.exists(CC):
+        rc, o, _ = sh(CC, "state")
+        for line in o.splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                d[k] = int(v) if k in ("bright", "vol") and v.isdigit() else v
+    return d
+
+
+def battery():
+    for name in sorted(os.listdir("/sys/class/power_supply")) if os.path.isdir("/sys/class/power_supply") else []:
+        p = "/sys/class/power_supply/" + name
+        try:
+            if open(p + "/type").read().strip() == "Battery":
+                return int(open(p + "/capacity").read().strip()), open(p + "/status").read().strip()
+        except Exception:
+            continue
+    return -1, ""
+
+
+def profile():
+    rc, o, _ = sh("busctl", "get-property", "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles", "net.hadess.PowerProfiles", "ActiveProfile")
+    m = re.search(r'"([^"]+)"', o)
+    return m.group(1) if m else ""
+
+
+def scale_now():
+    rc, o, _ = sh("kscreen-doctor", "-o")
+    m = re.search(r"Scale:\s*([0-9.]+)", ANSI.sub("", o))
+    return float(m.group(1)) if m else 1.0
+
+
+def cmd_state():
+    d = read_cc_state()
+    st = load_state()
+    cap, bst = battery()
+    scheme = current_scheme()
+    d.update({
+        "scale": scale_now(),
+        "dark": "on" if "dark" in scheme.lower() else "off",
+        "scheme": scheme,
+        "accent": st.get("accent", ACCENT_DEFAULT),
+        "kbd": "on" if kread("Wayland", "VirtualKeyboardEnabled", "false", "kwinrc") == "true" else "off",
+        "battery": cap, "batstatus": bst, "profile": profile(),
+    })
+    out(d)
+
+
+def cmd_wifi_list():
+    rc, o, _ = sh("nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", "no")
+    rc2, kn, _ = sh("nmcli", "-t", "-f", "NAME,TYPE", "connection", "show")
+    known = set()
+    for l in kn.splitlines():
+        parts = re.split(r"(?<!\\):", l)
+        if len(parts) >= 2 and "wireless" in parts[1]:
+            known.add(parts[0].replace("\\:", ":"))
+    nets, seen = [], set()
+    for l in o.splitlines():
+        p = [x.replace("\\:", ":") for x in re.split(r"(?<!\\):", l)]
+        if len(p) < 4 or not p[1] or p[1] in seen:
+            continue
+        seen.add(p[1])
+        nets.append({"ssid": p[1], "signal": int(p[2] or 0), "sec": p[3], "active": p[0] == "*", "known": p[1] in known})
+    nets.sort(key=lambda n: (not n["active"], -n["signal"]))
+    out(nets)
+
+
+def cmd_wifi_connect(ssid):
+    sh("nmcli", "device", "wifi", "rescan", timeout=10)
+    rc, o, e = sh("nmcli", "connection", "up", "id", ssid, timeout=40)
+    if rc != 0:
+        rc, o, e = sh("nmcli", "device", "wifi", "connect", ssid, timeout=40)
+    out({"ok": rc == 0, "message": (o or e)[:200]})
+
+
+def cmd_bt_list():
+    rc, o, _ = sh("bluetoothctl", "devices", "Paired")
+    if rc != 0 or not o:
+        rc, o, _ = sh("bluetoothctl", "devices")
+    devs = []
+    for l in o.splitlines():
+        m = re.match(r"Device\s+([0-9A-F:]{17})\s+(.*)", l)
+        if not m:
+            continue
+        rc, info, _ = sh("bluetoothctl", "info", m.group(1))
+        icon = re.search(r"Icon:\s*(\S+)", info)
+        devs.append({"mac": m.group(1), "name": m.group(2), "connected": "Connected: yes" in info,
+                     "paired": "Paired: yes" in info, "icon": icon.group(1) if icon else ""})
+    devs.sort(key=lambda d: (not d["connected"], d["name"].lower()))
+    out(devs)
+
+
+def cmd_bt_connect(mac, on):
+    rc, o, e = sh("bluetoothctl", "connect" if on else "disconnect", mac, timeout=30)
+    out({"ok": rc == 0, "message": (o or e)[-200:]})
+
+
+def cmd_scale(v):
+    v = float(v)
+    rc, o, e = sh("kscreen-doctor", "output.%s.scale.%s" % (OUTPUT, v))
+    out({"ok": rc == 0, "scale": scale_now()})
+
+
+def apply_scheme(scheme, accent):
+    """plasma-apply-colorscheme IGNORES a scheme name that is given together with --accent-color and recolours the scheme it believes is
+    current (BreezeLight when kdeglobals has no ColorScheme key: a dark tablet turned light). So: pin the scheme first, then add the accent."""
+    rc, o, e = sh("plasma-apply-colorscheme", scheme)
+    if rc != 0:
+        return rc, o, e
+    return sh("plasma-apply-colorscheme", "--accent-color", accent)
+
+
+def cmd_dark(on):
+    st = load_state()
+    accent = st.get("accent", ACCENT_DEFAULT)
+    scheme = "BreezeDark" if on else "BreezeLight"
+    rc, o, e = apply_scheme(scheme, accent)
+    out({"ok": rc == 0, "scheme": scheme})
+
+
+def cmd_accent(hexcolor):
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", hexcolor):
+        out({"ok": False, "message": "bad colour"}); return
+    st = load_state(); st["accent"] = hexcolor.lower(); save_state(st)
+    rc, o, e = apply_scheme(current_scheme(), hexcolor)
+    out({"ok": rc == 0, "accent": hexcolor.lower()})
+
+
+def cmd_kbd(on):
+    v = "true" if on else "false"
+    sh("kwriteconfig6", "--notify", "--file", "kwinrc", "--group", "Wayland", "--key", "VirtualKeyboardEnabled", v)
+    if on:
+        sh("kwriteconfig6", "--notify", "--file", "kwinrc", "--group", "Wayland", "--key", "InputMethod", "/usr/share/applications/org.kde.plasma.keyboard.desktop")
+    sh("qdbus6", "org.kde.KWin", "/KWin", "reconfigure")
+    out({"ok": True, "kbd": "on" if on else "off"})
+
+
+def cmd_profile(name):
+    rc, o, e = sh("busctl", "set-property", "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles", "net.hadess.PowerProfiles", "ActiveProfile", "s", name)
+    out({"ok": rc == 0, "profile": profile()})
+
+
+def cmd_dock_get():
+    if not os.path.exists(DOCK):
+        out({}); return
+    rc, o, _ = sh(DOCK, "get")
+    try:
+        out(json.loads(o))
+    except Exception:
+        out({})
+
+
+def cmd_dock_set(pairs):
+    rc, o, e = sh(DOCK, "apply", *pairs, timeout=60)
+    out({"ok": rc == 0, "message": (o or e)[-200:]})
+
+
+def human(n):
+    for u in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024 or u == "TB":
+            return ("%d %s" % (n, u)) if u == "B" else ("%.1f %s" % (n, u))
+        n /= 1024.0
+
+
+def cmd_about():
+    osr = {}
+    for p in ("/etc/os-release", "/usr/lib/os-release"):
+        try:
+            for l in open(p):
+                if "=" in l:
+                    k, v = l.rstrip("\n").split("=", 1); osr.setdefault(k, v.strip('"'))
+            break
+        except Exception:
+            pass
+    rel = {}
+    try:
+        for l in open("/etc/dorothyos-release"):
+            if "=" in l:
+                k, v = l.rstrip("\n").split("=", 1); rel[k] = v.strip('"')
+    except Exception:
+        pass
+    mem = 0
+    try:
+        for l in open("/proc/meminfo"):
+            if l.startswith("MemTotal:"):
+                mem = int(l.split()[1]) * 1024
+    except Exception:
+        pass
+    du = shutil.disk_usage("/")
+    try:
+        up = int(float(open("/proc/uptime").read().split()[0]))
+    except Exception:
+        up = 0
+    model = ""
+    try:
+        model = open("/proc/device-tree/model").read().strip("\0\n ")
+    except Exception:
+        pass
+    rc, plasma, _ = sh("plasmashell", "--version")
+    # This app is DorothyOS Settings: the product is always shown as DorothyOS. On a DorothyOS image os-release says so; on a tablet that only got
+    # the user-level DorothyOS interface (the reference tablet) the version is the one of this release and the base system is not advertised.
+    ours = osr.get("ID") == "dorothyos"
+    version = rel.get("VERSION") or (osr.get("VERSION", "") if ours else "") or RELEASE_VERSION
+    out({
+        "name": "DorothyOS",
+        "version": version,
+        "pretty": "DorothyOS " + version,
+        "build": rel.get("BUILD_DATE", ""),
+        "device": model or "Xiaomi Pad 6",
+        "kernel": os.uname().release,
+        "plasma": plasma.replace("plasmashell", "").strip(),
+        "memory": human(mem),
+        "disk_used": human(du.used), "disk_total": human(du.total), "disk_percent": int(du.used * 100 / du.total) if du.total else 0,
+        "uptime": "%dd %dh %dm" % (up // 86400, (up % 86400) // 3600, (up % 3600) // 60),
+        "home_url": rel.get("HOME_URL") or (osr.get("HOME_URL", "") if ours else ""),
+    })
+
+
+CREDITS_TEXT = """DorothyOS is created and maintained by Andreas Boglou - https://boglou.com
+
+It stands on the work of many open-source communities. Thank you.
+
+  postmarketOS and Alpine Linux - the base system, the device packages and the build tools
+  The pipa mainline-Linux community - Linux and U-Boot for the Xiaomi Pad 6
+  KDE - Plasma, Frameworks and the apps
+  Qt, Mesa (freedreno / turnip), libcamera, PipeWire, systemd, NetworkManager, BlueZ, Firefox, Flatpak and Flathub,
+  COSMIC Camera, and hundreds of other projects
+
+Full list and licences:  /usr/share/doc/dorothyos-branding/CREDITS.md  and  /usr/share/licenses
+
+DorothyOS is an independent project. It is not affiliated with or endorsed by the projects named above."""
+
+
+def cmd_credits():
+    rc, o, e = sh("kdialog", "--title", "Acknowledgements", "--msgbox", CREDITS_TEXT, timeout=600)
+    out({"ok": rc == 0})
+
+
+def main(argv):
+    if not argv:
+        print(__doc__); return 2
+    c, a = argv[0], argv[1:]
+    onoff = lambda i=0: (a[i] if len(a) > i else "on") == "on"
+    if c == "state": cmd_state()
+    elif c == "wifi-list": cmd_wifi_list()
+    elif c == "wifi-connect": cmd_wifi_connect(a[0])
+    elif c in ("wifi", "bt", "night", "rotlock", "dnd", "mute"):
+        rc, o, e = sh(CC, c, "on" if onoff() else "off", timeout=30); out({"ok": rc == 0})
+    elif c in ("bright", "volume"):
+        rc, o, e = sh(CC, c, str(int(float(a[0])))); out({"ok": rc == 0})
+    elif c == "bt-list": cmd_bt_list()
+    elif c == "bt-connect": cmd_bt_connect(a[0], True)
+    elif c == "bt-disconnect": cmd_bt_connect(a[0], False)
+    elif c == "scale": cmd_scale(a[0])
+    elif c == "dark": cmd_dark(onoff())
+    elif c == "accent": cmd_accent(a[0])
+    elif c == "kbd": cmd_kbd(onoff())
+    elif c == "profile": cmd_profile(a[0])
+    elif c == "dock-get": cmd_dock_get()
+    elif c == "dock-set": cmd_dock_set(a)
+    elif c == "icons-style":
+        rc, o, e = sh(ICONS, "set", a[0], "force", timeout=60); out({"ok": rc == 0})
+    elif c == "wallpaper-next":
+        rc, o, e = sh(WALL, "next", timeout=40); out({"ok": rc == 0, "message": o[-200:]})
+    elif c == "about": cmd_about()
+    elif c == "credits": cmd_credits()
+    else:
+        print(__doc__); return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

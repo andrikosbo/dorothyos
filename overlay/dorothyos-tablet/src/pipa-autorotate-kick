@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+# pipa-autorotate-kick — user service for the Xiaomi Pad 6 (postmarketOS, Plasma 6.8, iio-sensor-proxy 3.9).
+#
+# Problem: KWin claims the accelerometer (net.hadess.SensorProxy.ClaimAccelerometer) the instant the proxy owns its D-Bus
+# name, but the proxy only finishes probing its Qualcomm SSC sensors ~0.5 s later (at boot: ~45 s later, when the sensor
+# DSP is up). A claim that arrives before the driver exists is counted but never starts the sensor stream, so the
+# orientation stays "undefined" and the screen never auto-rotates. Later claims do not help (refcount already > 0).
+#
+# Fix: whenever the proxy (re)appears, wait until it reports HasAccelerometer, then flip KWin's per-output auto-rotate
+# policy to "never" and straight back to its previous value. KWin releases and re-claims the sensor, now after the driver
+# exists, and the stream starts. Nothing is changed permanently: the previous policy is restored (and recorded in
+# ~/.cache/pipa-autorotate-policy so that a killed service can never leave it on "never").
+import os, re, subprocess, sys, time
+
+import dbus
+import dbus.mainloop.glib
+from gi.repository import GLib
+
+NAME, PATH, IFACE = "net.hadess.SensorProxy", "/net/hadess/SensorProxy", "net.hadess.SensorProxy"
+OUTPUT = os.environ.get("PIPA_OUTPUT", "DSI-1")
+STATE = os.path.expanduser("~/.cache/pipa-autorotate-policy")
+os.environ.setdefault("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
+os.environ.setdefault("WAYLAND_DISPLAY", "wayland-1")
+os.environ.setdefault("DBUS_SESSION_BUS_ADDRESS", "unix:path=%s/bus" % os.environ["XDG_RUNTIME_DIR"])
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+bus = dbus.SystemBus()
+scheduled = False
+
+
+def log(msg):
+    print(msg, flush=True)
+
+
+def prop(name):
+    try:
+        obj = bus.get_object(NAME, PATH, introspect=False)
+        return obj.Get(IFACE, name, dbus_interface="org.freedesktop.DBus.Properties")
+    except Exception:
+        return None
+
+
+def policy():
+    """Current KWin auto-rotate policy of the panel: never | inTabletMode | always | incapable | None."""
+    try:
+        out = subprocess.run(["kscreen-doctor", "-o"], capture_output=True, text=True, timeout=20).stdout
+    except Exception:
+        return None
+    for line in ANSI.sub("", out).splitlines():
+        if "Auto Rotate Policy:" in line:
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+def set_policy(value):
+    r = subprocess.run(["kscreen-doctor", "output.%s.autoRotatePolicy.%s" % (OUTPUT, value)],
+                       capture_output=True, text=True, timeout=20)
+    return r.returncode == 0
+
+
+def restore_leftover():
+    """A previous run was killed mid-toggle: put the recorded policy back."""
+    try:
+        saved = open(STATE).read().strip()
+    except OSError:
+        return
+    if saved in ("inTabletMode", "always") and policy() == "never":
+        log("restoring leftover policy %s" % saved)
+        set_policy(saved)
+    try:
+        os.remove(STATE)
+    except OSError:
+        pass
+
+
+def kick():
+    for _ in range(120):                      # wait for the proxy to have probed the accelerometer
+        if prop("HasAccelerometer"):
+            break
+        time.sleep(1)
+    else:
+        log("proxy has no accelerometer; nothing to do")
+        return
+    time.sleep(1)
+    cur = None
+    for _ in range(30):                       # KWin shows "incapable" until it has noticed the sensor
+        cur = policy()
+        if cur in ("inTabletMode", "always", "never"):
+            break
+        time.sleep(1)
+    if cur not in ("inTabletMode", "always"):
+        log("policy is %r; not touching it" % cur)
+        return
+    for attempt in (1, 2, 3):
+        os.makedirs(os.path.dirname(STATE), exist_ok=True)
+        open(STATE, "w").write(cur)
+        try:
+            set_policy("never")
+            time.sleep(1.5)
+        finally:
+            set_policy(cur)
+            if policy() == cur:
+                try:
+                    os.remove(STATE)
+                except OSError:
+                    pass
+        time.sleep(3)
+        ori = prop("AccelerometerOrientation")
+        log("kick %d: policy restored to %s, proxy orientation=%s" % (attempt, cur, ori))
+        if ori not in (None, "undefined"):
+            return
+
+
+def run_scheduled():
+    global scheduled
+    try:
+        kick()
+    except Exception as exc:                  # never die on a transient error
+        log("kick failed: %r" % (exc,))
+    scheduled = False
+    return False
+
+
+def schedule(delay=2):
+    global scheduled
+    if not scheduled:
+        scheduled = True
+        GLib.timeout_add_seconds(delay, run_scheduled)
+
+
+def on_name_owner_changed(name, old, new):
+    if name == NAME and new:
+        log("proxy (re)started")
+        schedule()
+
+
+def main():
+    restore_leftover()
+    bus.add_signal_receiver(on_name_owner_changed, "NameOwnerChanged", "org.freedesktop.DBus",
+                            "org.freedesktop.DBus", arg0=NAME)
+    try:
+        if bus.name_has_owner(NAME):
+            schedule(1)
+    except Exception:
+        pass
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

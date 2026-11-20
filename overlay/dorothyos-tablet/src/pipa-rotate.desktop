@@ -1,0 +1,31 @@
+[Desktop Entry]
+Type=Application
+Name=Rotate Screen
+GenericName=Screen rotation
+Comment=Switch between portrait and landscape (long-press for more)
+Exec=/home/user/.local/bin/pipa-rotate cycle
+Icon=object-rotate-right
+Terminal=false
+Categories=Settings;System;
+StartupNotify=false
+Actions=Portrait;LandscapeRight;LandscapeLeft;Flip;
+
+[Desktop Action Portrait]
+Name=Portrait
+Exec=/home/user/.local/bin/pipa-rotate portrait
+Icon=object-rotate-left
+
+[Desktop Action LandscapeRight]
+Name=Landscape (top edge to the right)
+Exec=/home/user/.local/bin/pipa-rotate landscape
+Icon=object-rotate-right
+
+[Desktop Action LandscapeLeft]
+Name=Landscape (top edge to the left)
+Exec=/home/user/.local/bin/pipa-rotate landscape-left
+Icon=object-rotate-left
+
+[Desktop Action Flip]
+Name=Flip upside down
+Exec=/home/user/.local/bin/pipa-rotate flip
+Icon=object-flip-vertical

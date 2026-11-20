@@ -1,0 +1,12 @@
+[Unit]
+Description=Make KWin's accelerometer claim effective after iio-sensor-proxy (re)starts (Xiaomi Pad 6)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/pipa-autorotate-kick
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Id": "pipa-top-edge",
+        "Name": "Pipa top edge",
+        "Description": "Swipe down from the top edge of the screen to open the control center",
+        "Authors": [ { "Name": "pipa project" } ],
+        "License": "MIT",
+        "Version": "1.0",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

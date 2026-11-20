@@ -1,0 +1,22 @@
+#!/bin/sh
+# pipa-sensors-registry — Xiaomi Pad 6 specific, runs as root once per boot before hexagonrpcd-sdsp (see pipa-sensors-registry.service).
+# The sensor DSP server (hexagonrpcd) wants /mnt/vendor/persist/sensors/registry (calibration/registry written by the Android vendor
+# firmware, device-unique). That path does not exist on a postmarketOS install, so the accelerometer / light sensor never come up
+# (rotation, auto-brightness). We provide the directory from THIS device's own `persist` partition, mounted READ-ONLY and only read.
+# Nothing from any other device is shipped in this package; nothing is ever written to the persist partition.
+set -u
+DEST=/mnt/vendor/persist/sensors/registry
+[ -d "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null)" ] && exit 0
+PART=/dev/disk/by-partlabel/persist
+[ -b "$PART" ] || { echo "pipa-sensors-registry: $PART not found - sensors will not work" >&2; exit 0; }
+TMP=$(mktemp -d /run/pipa-persist.XXXXXX) || exit 0
+if mount -o ro,noload,nosuid,nodev,noexec "$PART" "$TMP" 2>/dev/null || mount -t ext4 -o ro,noload,nosuid,nodev,noexec "$PART" "$TMP" 2>/dev/null; then
+  if [ -d "$TMP/sensors/registry" ]; then
+    mkdir -p "$DEST" && cp -a "$TMP/sensors/registry/." "$DEST/" && echo "pipa-sensors-registry: copied the sensor registry of this device"
+    chown -R fastrpc:fastrpc /mnt/vendor 2>/dev/null || chown -R root:root /mnt/vendor
+    chmod -R u+rwX,go+rX /mnt/vendor
+  else echo "pipa-sensors-registry: no sensors/registry in persist" >&2; fi
+  umount "$TMP"
+else echo "pipa-sensors-registry: could not mount persist read-only" >&2; fi
+rmdir "$TMP" 2>/dev/null
+exit 0

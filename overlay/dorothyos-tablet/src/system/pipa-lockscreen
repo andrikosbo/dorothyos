@@ -1,0 +1,26 @@
+#!/bin/sh
+# pipa-lockscreen apply|restore — touch-friendly Plasma lock screen (runs as root from the package scriptlets).
+# The stock lockscreen QML of plasma-desktop is copied to /var/lib/dorothyos-tablet/lockscreen-orig and a patched copy
+# (lockscreen-patch.py: five asserted edits) is written over it. apk re-runs this through a trigger after every
+# plasma-desktop upgrade, because the upgrade puts the stock files back. A failing patch NEVER fails the apk transaction:
+# the stock files are restored and a warning is printed (the lock screen then simply stays stock).
+set -u
+LS=/usr/share/plasma/shells/org.kde.plasma.desktop/contents/lockscreen
+BK=/var/lib/dorothyos-tablet/lockscreen-orig
+SHARE=/usr/share/dorothyos-tablet
+case "${1:-}" in
+apply)
+  [ -f "$LS/LockScreenUi.qml" ] || { echo "pipa-lockscreen: $LS not found, nothing to patch"; exit 0; }
+  if ! grep -q 'pipa:' "$LS/LockScreenUi.qml"; then rm -rf "$BK"; mkdir -p "$BK"; cp -a "$LS/." "$BK/"; fi
+  [ -f "$BK/LockScreenUi.qml" ] || { echo "pipa-lockscreen: no stock copy, skipped"; exit 0; }
+  if python3 "$SHARE/system/lockscreen-patch.py" "$BK" "$LS" >/dev/null; then
+    echo "pipa-lockscreen: touch-friendly lock screen installed"
+  else
+    cp -a "$BK/." "$LS/"
+    echo "pipa-lockscreen: WARNING - the patch does not fit this Plasma version, stock lock screen kept"
+  fi ;;
+restore)
+  [ -f "$BK/LockScreenUi.qml" ] && cp -a "$BK/." "$LS/" && echo "pipa-lockscreen: stock lock screen restored" ;;
+*) echo "usage: $0 apply|restore"; exit 1 ;;
+esac
+exit 0

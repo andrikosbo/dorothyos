@@ -1,0 +1,3 @@
+#!/bin/sh
+/usr/bin/dorothyos-branding-apply --quiet || :
+exit 0

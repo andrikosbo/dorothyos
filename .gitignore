@@ -1,0 +1,10 @@
+dist/
+*.img
+*.simg
+*.zst
+*.xz
+__pycache__/
+.DS_Store
+tests/logs/
+release/out/
+*.raw

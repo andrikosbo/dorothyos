@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Camera
+Comment=Take photos and record videos with the rear camera
+Exec=/usr/share/dorothyos-tablet/camera/pipa-camera
+Icon=camera-photo
+Categories=AudioVideo;Video;Graphics;Photography;
+Keywords=camera;photo;video;picture;
+StartupNotify=true

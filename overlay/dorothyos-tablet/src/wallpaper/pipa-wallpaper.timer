@@ -1,0 +1,12 @@
+[Unit]
+Description=Hourly wallpaper change (landscapes / cityscapes)
+
+[Timer]
+# wall-clock based, so a tablet that slept through the hour changes on wake-up (monotonic timers stop during suspend)
+OnCalendar=hourly
+OnStartupSec=90
+Persistent=true
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

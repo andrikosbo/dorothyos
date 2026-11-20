@@ -1,0 +1,6 @@
+[Unit]
+Description=Change desktop and lock-screen wallpaper (Xiaomi Pad 6)
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/pipa-wallpaper auto

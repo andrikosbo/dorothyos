@@ -1,0 +1,12 @@
+[Unit]
+Description=Keep the top status bar at 32 px after plasmashell (re)starts
+After=plasma-plasmashell.service
+PartOf=plasma-plasmashell.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/pipa-statusbar-guard
+
+[Install]
+WantedBy=plasma-plasmashell.service

@@ -1,0 +1,35 @@
+#!/bin/sh
+# pipa-camera-setup — install / remove the camera app recommended for the Xiaomi Pad 6 (user level, no root).
+#   install (default)  adds the Flathub remote for this user if missing and installs "Camera" (io.github.cosmic_utils.camera,
+#                      GPL-3.0, ~150 MB + ~20 MB base app, needs internet). Nothing is downloaded unless you run this.
+#   remove             uninstalls it again;   status   prints whether it is installed.
+# Why this app: it reads the camera sensor's mounting rotation (270 degrees on this tablet) and follows the real screen rotation;
+# GNOME Snapshot ignores both. See camera/README.md.
+set -eu
+ID=io.github.cosmic_utils.camera
+# The Flatpak exports its own "Camera" menu entry; DorothyOS already has one ("Camera" = pipa-camera, same app, plus the first-run
+# download offer). A user-level override with NoDisplay=true hides the duplicate from menus and the home screen.
+HIDE=${XDG_DATA_HOME:-$HOME/.local/share}/applications/$ID.desktop
+hide_duplicate() {
+  src=$(ls "$HOME/.local/share/flatpak/exports/share/applications/$ID.desktop" /var/lib/flatpak/exports/share/applications/$ID.desktop 2>/dev/null | head -n1)
+  [ -n "$src" ] || return 0
+  mkdir -p "$(dirname "$HIDE")"
+  if ! grep -q '^X-DorothyOS-Hidden=true' "$HIDE" 2>/dev/null; then
+    awk 'BEGIN{done=0} /^\[Desktop Entry\]/ && !done {print; print "NoDisplay=true"; print "X-DorothyOS-Hidden=true"; done=1; insec=1; next}
+         /^\[/ {insec=0} insec && /^NoDisplay=/ {next} {print}' "$src" > "$HIDE"
+  fi
+}
+case "${1:-install}" in
+install)
+  command -v flatpak >/dev/null || { echo "flatpak is not installed" >&2; exit 1; }
+  flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  flatpak install --user --noninteractive -y flathub "$ID"
+  hide_duplicate ;;
+remove)
+  flatpak uninstall --user --noninteractive -y "$ID"
+  grep -q '^X-DorothyOS-Hidden=true' "$HIDE" 2>/dev/null && rm -f "$HIDE" || : ;;
+hide) hide_duplicate ;;
+status)
+  if flatpak info "$ID" >/dev/null 2>&1; then echo "installed"; else echo "not installed"; exit 1; fi ;;
+*) echo "usage: $0 [install|remove|status|hide]" >&2; exit 2 ;;
+esac

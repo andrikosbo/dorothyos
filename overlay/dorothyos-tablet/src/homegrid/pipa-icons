@@ -1,0 +1,38 @@
+#!/bin/sh
+# pipa-icons set light|dark|glass [force] — switch the squircle icon style of the launchers (dock, app menu, Discover ...).
+#   The three tile sets (shipped inside the home-grid widget) live in the user's hicolor theme under different names:
+#       pipa-tile-<app>  (light)     pipa-tile-dark-<app>     pipa-tile-glass-<app>
+#   and "set" rewrites Icon= in the user-level launcher overrides (~/.local/share/applications/*.desktop) to the wanted set; the dock picks the
+#   change up live from the rebuilt desktop-file cache. The dock tools (keyboard / overview / close) and the control-center button keep their look.
+# pipa-icons get — print the style in use.
+T=$HOME/.local/share/plasma/plasmoids/org.pipa.homegrid/contents/tiles
+ICO=$HOME/.local/share/icons/hicolor
+APPS=$HOME/.local/share/applications
+STATE=$HOME/.local/share/pipa-home/icon-style
+case "${1:-}" in
+set)
+  s=${2:-light}
+  case "$s" in light) pre="" ;; dark|glass) pre="$s-" ;; *) echo "style: light|dark|glass" >&2; exit 1 ;; esac
+  [ -d "$T/$s/512" ] || { echo "no tile set '$s' in $T" >&2; exit 1; }
+  mkdir -p "$(dirname "$STATE")"
+  if [ "${3:-}" = force ] || [ ! -e "$STATE.sets" ]; then      # (re)install all three sets into hicolor
+    for st in light dark glass; do
+      case "$st" in light) p="" ;; *) p="$st-" ;; esac
+      for r in 512 256; do
+        mkdir -p "$ICO/${r}x${r}/apps"
+        for f in "$T/$st/$r/"pipa-tile-*.png; do b=$(basename "$f"); cp "$f" "$ICO/${r}x${r}/apps/pipa-tile-$p${b#pipa-tile-}"; done
+      done
+    done
+    gtk-update-icon-cache -q -f "$ICO" 2>/dev/null; echo ok > "$STATE.sets"
+  fi
+  for f in "$APPS"/*.desktop; do
+    grep -q '^Icon=pipa-tile-' "$f" || continue
+    case "$(basename "$f")" in pipa-keyboard.desktop|pipa-overview.desktop|pipa-close.desktop) continue ;; esac
+    sed -i "/^\[Desktop Entry\]/,/^\[/ s#^Icon=pipa-tile-\(dark-\|glass-\)\{0,1\}#Icon=pipa-tile-$pre#" "$f"
+  done
+  echo "$s" > "$STATE"
+  kbuildsycoca6 >/dev/null 2>&1
+  exit 0 ;;
+get) cat "$STATE" 2>/dev/null || echo light ;;
+*) echo "usage: $0 set light|dark|glass [force] | get" >&2; exit 1 ;;
+esac

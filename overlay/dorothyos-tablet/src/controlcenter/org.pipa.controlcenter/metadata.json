@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [ { "Name": "pipa project" } ],
+        "Category": "System Information",
+        "Description": "Touch control center: Wi-Fi, Bluetooth, night light, rotation lock, do not disturb, brightness, volume",
+        "Icon": "preferences-system",
+        "Id": "org.pipa.controlcenter",
+        "License": "MIT",
+        "Name": "Pipa Control Center",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

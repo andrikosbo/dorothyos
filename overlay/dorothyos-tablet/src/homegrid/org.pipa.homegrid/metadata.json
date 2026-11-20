@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [ { "Name": "pipa project" } ],
+        "Category": "Utilities",
+        "Description": "Touch home screen: clock, date and a centred grid of large app icons",
+        "Icon": "view-app-grid",
+        "Id": "org.pipa.homegrid",
+        "License": "MIT",
+        "Name": "Pipa Home Grid",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

@@ -1,0 +1,6 @@
+#!/bin/sh
+# After resume the SLPI/fastrpc link can be stale and iio-sensor-proxy has crashed once on wake-up: restart both (queued, ordered).
+case "$1" in
+  post) systemctl --no-block try-restart hexagonrpcd-sdsp.service iio-sensor-proxy.service ;;
+esac
+exit 0

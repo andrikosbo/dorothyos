@@ -1,0 +1,100 @@
+# DorothyOS boot splash — an orange ring with a spinning arc.
+# No text on purpose: the Xiaomi Pad 6 panel boots in its native PORTRAIT orientation and Plymouth cannot know how the
+# tablet is held, so a rotation-proof mark looks right either way.  Assets: branding/splash/build-splash.py
+# The API calls follow the stock postmarketOS "pmos-spin" theme (same script engine, same initramfs plugins).
+
+Window.SetBackgroundTopColor(0.051, 0.051, 0.059);      # #0d0d0f
+Window.SetBackgroundBottomColor(0.051, 0.051, 0.059);
+
+global.FRAMES = 24;
+global.cx = Window.GetX() + Window.GetWidth() / 2;
+global.cy = Window.GetY() + Window.GetHeight() / 2;
+global.size = Math.Min(Window.GetWidth(), Window.GetHeight()) * 0.42;
+
+ring_image = Image("ring.png");
+ring_image = ring_image.Scale(size, size);
+ring_sprite = Sprite(ring_image);
+ring_sprite.SetPosition(cx - size / 2, cy - size / 2, 10);
+
+for (i = 0; i < FRAMES; i++)
+{
+    arc_name = "arc-";
+    if (i < 10)
+        arc_name = arc_name + "0";
+    arc_name = arc_name + i + ".png";
+    arc_image[i] = Image(arc_name);
+    arc_image[i] = arc_image[i].Scale(size, size);
+}
+arc_sprite = Sprite(arc_image[0]);
+arc_sprite.SetPosition(cx - size / 2, cy - size / 2, 11);
+
+global.counter = 0;
+global.frame_skip = 0;
+
+fun refresh_callback()
+{
+    # the refresh function runs at ~50 Hz: draw every second call (25 fps), one turn per 24 frames
+    frame_skip = 1 - frame_skip;
+    if (frame_skip)
+        return;
+    counter = counter + 1;
+    arc_sprite.SetImage(arc_image[counter % FRAMES]);
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+
+#========================================
+# Disk-encryption passphrase prompt (only appears on images the user built with --fde)
+#========================================
+
+pw_label_sprite = Sprite();
+pw_dots_sprite = Sprite();
+
+fun display_password_callback(prompt, bullets)
+{
+    label_image = Image.Text(prompt, 0.92, 0.92, 0.92, 1, "Sans 20", "center");
+    pw_label_sprite.SetImage(label_image);
+    pw_label_sprite.SetPosition(cx - label_image.GetWidth() / 2, cy + size * 0.8, 20);
+    pw_label_sprite.SetOpacity(1);
+    dots = "";
+    for (j = 0; j < bullets; j++)
+        dots = dots + "*";
+    if (dots == "")
+        dots = " ";
+    dots_image = Image.Text(dots, 0.99, 0.43, 0.0, 1, "Sans 26", "center");
+    pw_dots_sprite.SetImage(dots_image);
+    pw_dots_sprite.SetPosition(cx - dots_image.GetWidth() / 2, cy + size * 0.8 + 60, 20);
+    pw_dots_sprite.SetOpacity(1);
+}
+
+fun display_normal_callback()
+{
+    pw_label_sprite.SetOpacity(0);
+    pw_dots_sprite.SetOpacity(0);
+}
+
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
+
+#========================================
+# Status messages (kept at the bottom, grey)
+#========================================
+
+message_sprite = Sprite();
+message_sprite.SetPosition(10, 10, 10000);
+
+fun display_message_callback(text)
+{
+    text_image = Image.Text(text, 0.8, 0.8, 0.8, 0.8, "Sans 16", "center");
+    message_sprite.SetImage(text_image);
+    message_sprite.SetOpacity(1);
+    message_sprite.SetPosition(cx - text_image.GetWidth() / 2,
+                               Window.GetY() + Window.GetHeight() - (5 * text_image.GetHeight()), 10000);
+}
+
+fun hide_message_callback(text)
+{
+    message_sprite.SetOpacity(0);
+}
+
+Plymouth.SetDisplayMessageFunction(display_message_callback);
+Plymouth.SetHideMessageFunction(hide_message_callback);

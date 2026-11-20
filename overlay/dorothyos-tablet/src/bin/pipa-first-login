@@ -1,0 +1,50 @@
+#!/bin/sh
+# pipa-first-login — runs ONCE for every user at the first graphical login (XDG autostart, see pipa-first-login.desktop).
+# Applies the tablet-first Plasma setup of DorothyOS to THIS user's profile (user config only, nothing system-wide):
+#   phase2b  touch helpers (rotate / on-screen keyboard), Kickoff launcher
+#   phase10  Overview / Close tools, dock tools group, big window buttons
+#   phase11  hourly wallpaper rotation (only if pictures are installed)
+#   phase12  iPad-style home screen (org.pipa.homegrid) + tile icons
+#   phase13  touch control center + top/bottom edge swipes
+#   phase14  status bar + centered floating dock
+#   phase15  dock / status bar settings tool (pipa-dock)
+#   phase16  no splash, tablet screen timings, power button = lock
+#   phase17  on-screen keyboard, 250 % display scale
+#   phase18  DorothyOS accent colour
+#   phase19  DorothyOS start menu (replaces Kickoff in the dock) + DorothyOS Settings launcher
+# Every phase script is idempotent and has an `undo`; they log to ~/\.local/state/dorothyos-tablet/first-login.log.
+# Re-run by hand:  rm ~/\.local/state/dorothyos-tablet/first-login.done; pipa-first-login
+set -u
+# never for the KDE first-boot wizard session (user "plasma-setup", home in /run) or for system accounts
+[ "$(id -u)" -ge 1000 ] || exit 0
+case "$(id -un)" in plasma-setup|plasmalogin|nobody) exit 0 ;; esac
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/dorothyos-tablet
+SHARE=/usr/share/dorothyos-tablet
+DONE=$STATE/first-login.done
+mkdir -p "$STATE"
+[ -e "$DONE" ] && exit 0
+exec >>"$STATE/first-login.log" 2>&1
+echo "== $(date '+%F %T') pipa-first-login start (uid $(id -u))"
+export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+export DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}
+
+# a Plasma session must be up: the phases restart plasmashell and talk to KWin / plasmashell over D-Bus
+i=0
+until qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "1" >/dev/null 2>&1; do
+  i=$((i + 1)); [ "$i" -gt 60 ] && { echo "plasmashell did not come up in 120 s - will retry at the next login"; exit 1; }
+  sleep 2
+done
+sleep 5   # let the default panel layout be written to disk before it is edited
+command -v notify-send >/dev/null 2>&1 && notify-send -a "Tablet setup" -i preferences-desktop-tablet "Setting up your tablet" "This takes about a minute; the screen will flicker." || :
+
+fail=0
+for p in phase2b-look-and-feel phase10-tablet-ux-user phase11-wallpaper-user phase12-home-screen-user phase13-control-center-user \
+         phase14-statusbar-user phase15-dock-settings-user phase16-first-boot-user phase17-device-defaults-user \
+         phase18-branding-user phase19-start-menu-user; do
+  echo "-- $p"
+  sh "$SHARE/$p.sh" apply || { echo "!! $p exited with $?"; fail=$((fail + 1)); }
+done
+echo "== done, $fail phase(s) reported an error"
+[ "$fail" -eq 0 ] && touch "$DONE" || echo "not marking as done - see the messages above"
+command -v notify-send >/dev/null 2>&1 && notify-send -a "Tablet setup" -i preferences-desktop-tablet "Tablet setup finished" "Swipe up from the bottom edge for the home screen." || :
+exit 0

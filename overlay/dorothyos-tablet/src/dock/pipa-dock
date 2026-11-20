@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""pipa-dock — look and content of the dock (bottom panel) and the status bar (top panel). Runs on the tablet as the normal user.
+   pipa-dock apply [dockAlpha=0..100] [dockRadius=0..30] [dockSize=40..96] [barAlpha=0..100] [dockHide=0|1]   change and apply (unnamed keys keep their value)
+   pipa-dock get                      state as JSON
+   pipa-dock reset                    back to the stock look (Breeze panel background, 56 px dock, always visible)
+   pipa-dock launchers                the dock's apps as JSON [{token,id,name,icon}]
+   pipa-dock add <desktop-id> | remove <desktop-id> | move <desktop-id> <index>
+How: a tiny Plasma theme "pipa-dock-<n>" (only panels/panel-background, per panel via the north-/south- element prefix, see pipa_dock_theme.py)
+is written to ~/.local/share/plasma/desktoptheme and applied with plasma-apply-desktoptheme (the old revision is deleted: Plasma does not
+re-read a changed file, a new name forces it); size and auto-hide go through the plasmashell scripting API; the dock's apps are the "launchers"
+of the Icons-only Task Manager widget."""
+import glob, json, os, shutil, subprocess, sys
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import pipa_dock_theme
+
+HOME = os.path.expanduser("~")
+STATE = os.path.join(HOME, ".local/share/pipa-home/dock.json")
+THEMES = os.path.join(HOME, ".local/share/plasma/desktoptheme")
+DEFAULTS = {"dockAlpha": 85, "dockRadius": 18, "dockSize": 56, "barAlpha": 55, "dockHide": 0, "rev": 0, "styled": 0}
+ENV = dict(os.environ, XDG_RUNTIME_DIR="/run/user/%d" % os.getuid())
+ENV.setdefault("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/%d/bus" % os.getuid())
+
+def load():
+    try: s = json.load(open(STATE))
+    except Exception: s = {}
+    d = dict(DEFAULTS); d.update({k: v for k, v in s.items() if k in DEFAULTS}); return d
+def save(s):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True); json.dump(s, open(STATE, "w"))
+def run(*a):
+    return subprocess.run(a, env=ENV, capture_output=True, text=True, timeout=60)
+def script(js):
+    return run("qdbus6", "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", js).stdout.strip()
+def clamp(v, lo, hi): return max(lo, min(hi, int(float(v))))
+
+def apply(args):
+    s = load()
+    lim = {"dockAlpha": (0, 100), "dockRadius": (0, 30), "dockSize": (40, 96), "barAlpha": (0, 100), "dockHide": (0, 1)}
+    for a in args:
+        k, _, v = a.partition("=")
+        if k in lim: s[k] = clamp(v, *lim[k])
+    s["rev"] += 1; s["styled"] = 1
+    name = "pipa-dock-%d" % s["rev"]
+    pipa_dock_theme.write(THEMES, name, s["dockAlpha"], s["dockRadius"], s["barAlpha"])
+    r = run("plasma-apply-desktoptheme", name)
+    for d in glob.glob(os.path.join(THEMES, "pipa-dock-*")):
+        if os.path.basename(d) != name: shutil.rmtree(d, ignore_errors=True)
+    script("panels().forEach(function (p) { if (p.location == 'top') p.height = 32; if (p.location == 'bottom') { p.height = %d; p.hiding = '%s'; } })"
+           % (s["dockSize"], "dodgewindows" if s["dockHide"] else "none"))
+    save(s)
+    print(json.dumps(s))
+    return 0 if r.returncode == 0 else 1
+
+def reset():
+    run("plasma-apply-desktoptheme", "default")
+    for d in glob.glob(os.path.join(THEMES, "pipa-dock-*")): shutil.rmtree(d, ignore_errors=True)
+    script("panels().forEach(function (p) { if (p.location == 'top') p.height = 32; if (p.location == 'bottom') { p.height = 56; p.hiding = 'none'; } })")
+    s = dict(DEFAULTS); s["styled"] = 0; save(s); print(json.dumps(s))
+
+# ---- the dock's apps ------------------------------------------------------------------------------------------------------------------------
+GET_L = ("var o = ''; panels().forEach(function (p) { if (p.location == 'bottom') p.widgets().forEach(function (w) { if (w.type == 'org.kde.plasma.icontasks') "
+         "{ w.currentConfigGroup = ['General']; o = w.readConfig('launchers', ''); } }); }); print(o)")
+def tokens():
+    out = script(GET_L)
+    return [t for t in out.split(",") if t]
+def set_tokens(t):
+    js = ("panels().forEach(function (p) { if (p.location == 'bottom') p.widgets().forEach(function (w) { if (w.type == 'org.kde.plasma.icontasks') "
+          "{ w.currentConfigGroup = ['General']; w.writeConfig('launchers', %s); w.reloadConfig(); } }); })" % json.dumps(list(t)))
+    script(js)
+def desk_id(token):
+    return token[len("applications:"):-len(".desktop")] if token.startswith("applications:") and token.endswith(".desktop") else None
+def catalog():
+    try: return {a["id"]: a for a in json.loads(run(os.path.join(HOME, ".local/bin/pipa-home-apps")).stdout)}
+    except Exception: return {}
+def launchers():
+    cat = catalog(); out = []
+    for t in tokens():
+        i = desk_id(t)
+        if i and i in cat: out.append({"token": t, "id": i, "name": cat[i]["name"], "icon": cat[i]["icon"]})
+        elif t == "preferred://filemanager": out.append({"token": t, "id": "", "name": "Files", "icon": "system-file-manager"})
+        elif t.startswith("preferred://"): out.append({"token": t, "id": "", "name": t[12:].capitalize(), "icon": "application-x-executable"})
+        elif i: out.append({"token": t, "id": i, "name": i, "icon": "application-x-executable"})
+    print(json.dumps(out))
+
+def main(a):
+    c = a[0] if a else "get"
+    if c == "apply": return apply(a[1:])
+    if c == "get": print(json.dumps(load())); return 0
+    if c == "reset": reset(); return 0
+    if c == "launchers": launchers(); return 0
+    if c in ("add", "remove", "move") and len(a) >= 2:
+        t = tokens(); tok = a[1] if "://" in a[1] else "applications:%s.desktop" % a[1]
+        if c == "add" and tok not in t: t.append(tok)
+        elif c == "remove": t = [x for x in t if x != tok]
+        elif c == "move" and tok in t and len(a) >= 3:
+            t.remove(tok); t.insert(max(0, min(len(t), int(a[2]))), tok)
+        set_tokens(t); launchers(); return 0
+    print(__doc__); return 1
+sys.exit(main(sys.argv[1:]))

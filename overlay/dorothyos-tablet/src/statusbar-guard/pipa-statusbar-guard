@@ -1,0 +1,10 @@
+#!/bin/sh
+# pipa-statusbar-guard — keeps the top status bar at 32 px. Plasma 6.8 resets the top panel to its default thickness (54 px: huge clock,
+# two-row tray) whenever plasmashell restarts or the screen is rotated, so the height is re-applied after every start of plasmashell
+# (run by pipa-statusbar-guard.service). Safe to run by hand at any time.
+export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+JS='var ps = panels(); for (var i = 0; i < ps.length; i++) { var p = ps[i]; if (p.location == "top") { p.height = 32; } }'
+apply() { qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$JS" >/dev/null 2>&1; }
+n=0; until apply; do n=$((n+1)); [ "$n" -ge 60 ] && exit 0; sleep 1; done
+sleep 6; apply          # second pass once the layout has settled
+exit 0

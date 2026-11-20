@@ -1,0 +1,6 @@
+[General]
+Name=@NAME@
+Version=@RELEASE@
+Variant=@VARIANT@
+Logo=dorothyos
+LogoPath=/usr/share/icons/hicolor/512x512/apps/dorothyos.png

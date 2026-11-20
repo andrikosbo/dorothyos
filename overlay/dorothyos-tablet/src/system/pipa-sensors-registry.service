@@ -1,0 +1,11 @@
+[Unit]
+Description=Provide the sensor registry of this Xiaomi Pad 6 (read-only copy from its own persist partition)
+Before=hexagonrpcd-sdsp.service iio-sensor-proxy.service
+ConditionPathExists=!/mnt/vendor/persist/sensors/registry/sns_reg_version
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/pipa-sensors-registry
+
+[Install]
+WantedBy=multi-user.target

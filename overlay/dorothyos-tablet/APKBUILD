@@ -1,0 +1,124 @@
+# Maintainer: DorothyOS contributors <noreply@dorothyos.invalid>
+pkgname=dorothyos-tablet
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="Tablet-first Plasma experience (home screen, dock, control center, gestures) for the Xiaomi Pad 6"
+url="https://dorothy.gr/dorothyos"
+arch="noarch"
+license="MIT"
+# runtime commands used by the scripts / widgets (checked against the Alpine/postmarketOS indexes):
+#   qdbus6 -> qt6-qttools, kwriteconfig6/kreadconfig6 -> kconfig, kbuildsycoca6 -> kservice, kscreen-doctor -> libkscreen,
+#   plasma-apply-* -> plasma-workspace, kioclient -> kde-cli-tools, nmcli, bluetoothctl, pactl, notify-send, busctl (systemd)
+depends="
+	python3
+	py3-dbus
+	py3-gobject3
+	qt6-qttools
+	kconfig
+	kservice
+	libkscreen
+	kde-cli-tools
+	plasma-desktop
+	plasma-workspace
+	plasma-keyboard
+	plasma-setup
+	kwin
+	networkmanager-cli
+	bluez
+	pulseaudio-utils
+	libnotify
+	iio-sensor-proxy
+	flatpak
+	kdialog
+	"
+install="$pkgname.post-install $pkgname.post-upgrade $pkgname.pre-deinstall"
+# re-patch the lock screen whenever plasma-desktop puts the stock files back
+triggers="$pkgname.trigger=/usr/share/plasma/shells/org.kde.plasma.desktop/contents/lockscreen"
+# the tarball is made from ./src by build/make-source-tarball.sh (deterministic: sorted, uid 0, mtime 0)
+source="$pkgname-$pkgver.tar.gz"
+options="!check"
+
+build() {
+	return 0
+}
+
+package() {
+	local share="$pkgdir"/usr/share/dorothyos-tablet
+
+	# --- commands
+	install -Dm755 bin/pipa-first-login "$pkgdir"/usr/bin/pipa-first-login
+	install -Dm755 bin/pipa-sensors-registry "$pkgdir"/usr/bin/pipa-sensors-registry
+	install -Dm755 pipa-autorotate-kick "$pkgdir"/usr/bin/pipa-autorotate-kick
+
+	# --- the tree the per-user setup copies from (the phase scripts expect it flat)
+	install -d "$share" "$share"/system
+	for f in phase*.sh; do install -m755 "$f" "$share/$f"; done
+	for f in pipa-rotate pipa-keyboard; do install -m755 "$f" "$share/$f"; done
+	for f in pipa-rotate.desktop pipa-keyboard.desktop pipa-overview.desktop pipa-close.desktop; do
+		install -m644 "$f" "$share/$f"
+	done
+	cp -a homegrid controlcenter dock hometiles wallpaper launcher settings "$share"/
+	find "$share" -type d -exec chmod 755 {} +
+	find "$share" -type f \( -name '*.png' -o -name '*.qml' -o -name '*.xml' -o -name '*.json' -o -name '*.service' \
+		-o -name '*.timer' -o -name '*.py' -o -name '*.desktop' \) -exec chmod 644 {} +
+	chmod 755 "$share"/dock/pipa-dock "$share"/controlcenter/pipa-cc "$share"/controlcenter/pipa-dnd \
+		"$share"/homegrid/pipa-home-apps "$share"/homegrid/pipa-icons "$share"/wallpaper/pipa-wallpaper
+	install -m755 system/pipa-lockscreen "$share"/system/pipa-lockscreen
+	install -m644 system/lockscreen-patch.py system/make-tile-icons.py "$share"/system/
+
+	# --- status-bar guard: Plasma 6.8 resets the top panel to its 54 px default on every plasmashell start; this oneshot unit re-applies 32 px.
+	#     Enabled for every user through a .wants link (no per-user setup needed); phase14 also runs the script after it restarts plasmashell.
+	install -Dm755 statusbar-guard/pipa-statusbar-guard "$pkgdir"/usr/bin/pipa-statusbar-guard
+	install -Dm644 statusbar-guard/pipa-statusbar-guard.service "$pkgdir"/usr/lib/systemd/user/pipa-statusbar-guard.service
+	install -d "$pkgdir"/usr/lib/systemd/user/plasma-plasmashell.service.wants
+	ln -s ../pipa-statusbar-guard.service "$pkgdir"/usr/lib/systemd/user/plasma-plasmashell.service.wants/pipa-statusbar-guard.service
+
+	# --- DorothyOS Start (start menu plasmoid): system-wide, so every user's Plasma finds it; phase19 puts it into the dock
+	install -d "$pkgdir"/usr/share/plasma/plasmoids
+	cp -a launcher/org.dorothyos.launcher "$pkgdir"/usr/share/plasma/plasmoids/
+	find "$pkgdir"/usr/share/plasma/plasmoids/org.dorothyos.launcher -type d -exec chmod 755 {} +
+	find "$pkgdir"/usr/share/plasma/plasmoids/org.dorothyos.launcher -type f -exec chmod 644 {} +
+
+	# --- DorothyOS Settings (plasmoid shown by plasmawindowed in its own window) + its helper and launcher
+	cp -a settings/org.dorothyos.settings "$pkgdir"/usr/share/plasma/plasmoids/
+	find "$pkgdir"/usr/share/plasma/plasmoids/org.dorothyos.settings -type d -exec chmod 755 {} +
+	find "$pkgdir"/usr/share/plasma/plasmoids/org.dorothyos.settings -type f -exec chmod 644 {} +
+	install -Dm755 settings/dorothyos-settings "$pkgdir"/usr/bin/dorothyos-settings
+	install -Dm755 settings/dorothyos-settings-helper "$pkgdir"/usr/bin/dorothyos-settings-helper
+	install -Dm644 settings/dorothyos-settings.desktop "$pkgdir"/usr/share/applications/dorothyos-settings.desktop
+
+	# --- camera: launcher (installs the recommended Flathub camera app on request), setup helper, desktop entry
+	install -d "$share"/camera
+	install -m755 camera/pipa-camera camera/pipa-camera-setup camera/pipa-camera-live.sh "$share"/camera/
+	install -m644 camera/README.md "$share"/camera/README.md
+	install -Dm644 camera/pipa-camera.desktop "$pkgdir"/usr/share/applications/pipa-camera.desktop
+
+	# --- display: 250 % scale, landscape, auto-rotate for outputs without a user config (login screen, first-boot wizard, new accounts).
+	# KWin reads kwinoutputconfig.json from every XDG config dir (verified with a virtual KWin session); a user's own file wins.
+	install -Dm644 system/kwinoutputconfig.json "$pkgdir"/etc/xdg/kwinoutputconfig.json
+
+	# --- on-screen keyboard for every KWin session, including the first-boot wizard (it runs as the throw-away user "plasma-setup" whose
+	# home is in /run, so a per-user setting never reaches it and the wizard could not be filled in on a tablet without a keyboard).
+	# KConfig merges /etc/xdg/kwinrc under the user's own file, so phase17 and a user's choice still win.
+	install -Dm644 system/kwinrc "$pkgdir"/etc/xdg/kwinrc
+
+	# --- first login: XDG autostart for every user
+	install -Dm644 pipa-first-login.desktop "$pkgdir"/etc/xdg/autostart/pipa-first-login.desktop
+
+	# --- sensors (device-specific): registry from the tablet's own persist partition, restart after suspend
+	install -Dm644 system/pipa-sensors-registry.service "$pkgdir"/usr/lib/systemd/system/pipa-sensors-registry.service
+	install -Dm644 system/10-pipa.conf "$pkgdir"/usr/lib/systemd/system/iio-sensor-proxy.service.d/10-pipa.conf
+	install -Dm755 system/50-pipa-sensors "$pkgdir"/usr/lib/systemd/system-sleep/50-pipa-sensors
+	install -d "$pkgdir"/usr/lib/systemd/system/multi-user.target.wants
+	ln -s ../pipa-sensors-registry.service "$pkgdir"/usr/lib/systemd/system/multi-user.target.wants/pipa-sensors-registry.service
+
+	# --- KWin needs a nudge after the sensor proxy (re)starts: user service, enabled for every user
+	install -Dm644 pipa-autorotate-kick.service "$pkgdir"/usr/lib/systemd/user/pipa-autorotate-kick.service
+	install -d "$pkgdir"/usr/lib/systemd/user/graphical-session.target.wants
+	ln -s ../pipa-autorotate-kick.service "$pkgdir"/usr/lib/systemd/user/graphical-session.target.wants/pipa-autorotate-kick.service
+
+	# --- KDE's first-boot wizard creates the account (no account / password is baked into the image)
+	ln -s ../plasma-setup.service "$pkgdir"/usr/lib/systemd/system/multi-user.target.wants/plasma-setup.service
+
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}

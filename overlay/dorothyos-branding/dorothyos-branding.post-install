@@ -1,0 +1,7 @@
+#!/bin/sh
+/usr/bin/dorothyos-branding-apply || :
+# The boot splash lives in the initramfs: images get it from the image build; on a running system run `mkinitfs` once.
+if [ -d /run/systemd/system ]; then
+	echo "dorothyos-branding: run 'mkinitfs' (as root) once to put the DorothyOS boot splash into the initramfs."
+fi
+exit 0

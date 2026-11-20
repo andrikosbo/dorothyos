@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [ { "Name": "DorothyOS contributors" } ],
+        "Category": "Application Launchers",
+        "Description": "Touch-first start menu: pinned apps, recent apps, all apps by category, search and power buttons",
+        "Icon": "dorothyos",
+        "Id": "org.dorothyos.launcher",
+        "License": "MIT",
+        "Name": "DorothyOS Start",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

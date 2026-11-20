@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+# pipa-dnd — holds a "Do not disturb" inhibition on the Plasma notification server for as long as it runs.
+# (The server drops an inhibition when the client that asked for it goes away, so a one-shot call is not enough.)
+# Started/stopped by `pipa-cc dnd on|off` as the transient user unit pipa-dnd.service.
+import signal
+import dbus, dbus.mainloop.glib
+from gi.repository import GLib
+
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+bus = dbus.SessionBus()
+iface = dbus.Interface(bus.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications"), "org.freedesktop.Notifications")
+cookie = iface.Inhibit("pipa-control-center", "Do not disturb", dbus.Dictionary({}, signature="sv"))
+loop = GLib.MainLoop()
+
+
+def stop(*_):
+    try:
+        iface.UnInhibit(cookie)
+    except Exception:
+        pass
+    loop.quit()
+    return False
+
+
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, stop)
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, stop)
+loop.run()

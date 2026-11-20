@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Close app
+GenericName=Close the current app
+Comment=Close the app that is on screen (title bars are hidden on maximized windows)
+Exec=qdbus6 org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component.invokeShortcut "Window Close"
+Icon=window-close
+Terminal=false
+Categories=System;
+StartupNotify=false

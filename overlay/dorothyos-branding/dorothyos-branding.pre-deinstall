@@ -1,0 +1,8 @@
+#!/bin/sh
+# give the system its upstream identity back
+if [ -f /etc/os-release ] && [ ! -L /etc/os-release ]; then
+	rm -f /etc/os-release && ln -s ../usr/lib/os-release /etc/os-release
+fi
+rm -f /etc/xdg/kcm-about-distrorc
+[ -f /etc/plymouth/plymouthd.conf ] && sed -i 's/^Theme=dorothyos/Theme=pmos-spin/' /etc/plymouth/plymouthd.conf
+exit 0

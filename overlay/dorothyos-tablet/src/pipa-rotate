@@ -1,0 +1,20 @@
+#!/bin/sh
+# pipa-rotate — manual screen rotation for the Xiaomi Pad 6 (Plasma/Wayland). Works with or without auto-rotate.
+#   pipa-rotate portrait | landscape | landscape-left | landscape-right | flip | cycle | status
+# Native panel is portrait: "none" = portrait, "right" = landscape (top edge to the right), "left" = landscape (top edge to the left).
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+OUT=DSI-1
+cur() { kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/Rotation:/{print $2; exit}'; }
+set_rot() { kscreen-doctor "output.$OUT.rotation.$1" >/dev/null 2>&1; }
+notify() { command -v notify-send >/dev/null && notify-send -a "Rotate screen" -t 2500 "$1" "$2" >/dev/null 2>&1; }
+case "${1:-cycle}" in
+  portrait)         set_rot none ;;
+  landscape|landscape-right) set_rot right ;;
+  landscape-left)   set_rot left ;;
+  flip)             case "$(cur)" in 1) set_rot inverted;; 2) set_rot none;; 4) set_rot left;; 8) set_rot right;; *) set_rot none;; esac ;;
+  cycle)            case "$(cur)" in 1) set_rot right;; 2) set_rot inverted;; 4) set_rot left;; 8) set_rot none;; *) set_rot none;; esac ;;
+  status)           kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -E 'Rotation|Auto Rotate|Geometry' ;;
+  *) echo "usage: pipa-rotate portrait|landscape|landscape-left|flip|cycle|status"; exit 2 ;;
+esac

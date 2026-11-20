@@ -1,0 +1,18 @@
+# Extra packages of the image, one per line (comments allowed). The base is postmarketOS' own `postmarketos-ui-plasma-desktop`
+# (KDE Plasma 6) with `ui_extras` (Dolphin, Kate, Gwenview, Konsole, System Monitor, KDE Connect, Discover ...).
+# `dorothyos-tablet` (the tablet-first UI) and `dorothyos-branding` are added separately by build/build-image.sh as locally built apks.
+firefox
+vlc
+okular
+kcalc
+spectacle
+snapshot              # camera application (PipeWire / libcamera)
+plasma-keyboard       # on-screen keyboard
+plasma-setup          # KDE first-boot wizard: creates the user account, language, time zone, Wi-Fi (no shared default password)
+tuned-ppd             # power profiles for the Plasma battery applet
+flatpak
+discover-backend-apk
+apk-polkit-rs
+apk-polkit-rs-systemd
+font-droid
+font-twemoji
